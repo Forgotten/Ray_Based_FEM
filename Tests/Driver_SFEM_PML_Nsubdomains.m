@@ -23,7 +23,7 @@ fquadorder = 4;            % numerical quadrature order
 % size of the physical domain
 a = 1/2;
 % physical domain between -(a, a) to (a, a)
-NPW = 5;
+NPW = 10;
 
 omega = 2*pi*3;
 % discretization step (the constant needs to be modified)
@@ -101,36 +101,99 @@ MArray = {};
 for ii = 1:nSub
     % we will need to make sure that the wpml has the correct width
     MArray{ii} = model;
+    % we need to be carefull when defining the PML
+    if ii == 1
+        wpmlvec = [wpml, wpml-2*h, wpml, wpml];
+    elseif ii ==nSub
+        wpmlvec = [wpml-2*h, wpml, wpml, wpml];
+    else
+         wpmlvec = [wpml-2*h, wpml-2*h, wpml, wpml];
+    end     
     MArray{ii}.init(nodeArray{ii},elemArray{ii},omega,...
-                    wpml-h,sigmaMax,pde,fquadorder);
+                    wpmlvec,sigmaMax,pde,fquadorder);
 
 end
 
 % we need to define all the local (and global) local Indices
 
+indxn = {};
+indxnp = {};
+indx0  = {};
+indx1  = {};
 
-% defining local model (i.e. local subdomains this would need to be
-% properly encapsulated 
-M1 = model;
-M1.init(node1,elem1,omega,wpml,sigmaMax, pde,fquadorder);
+for ii = 1:nSub
+    if ii ~= 1
+        indx0{ii} = find(MArray{ii}.node(MArray{ii}.freeNode,1) == separatorN(ii-1) );
+        indx1{ii} = find(MArray{ii}.node(MArray{ii}.freeNode,1) == separator1(ii-1) );
+    end
+    
+    if ii ~= nSub
+        indxn{ii} = find(MArray{ii}.node(MArray{ii}.freeNode,1) == separatorN(ii) );
+        indxnp{ii}= find(MArray{ii}.node(MArray{ii}.freeNode,1) == separator1(ii) );
+    end
+end
 
-% indices of the boundary points
-ind1xn  = find(M1.node(M1.freeNode,1) == separator0 );
-ind1xnp = find(M1.node(M1.freeNode,1) == separator1 );
+%% Preliminary tests
+% testing the continuity of the discrete operator within each subproblem
+for ii = 2:nSub
 
-% indices of the local interior points
-ind1Int = find(M1.node(M1.freeNode,1) <= separator0 );
+    fprintf('misfit is given by %d \n',...
+            norm(max(abs(MArray{ii}.H(indx0{ii},indx1{ii}) ...
+            - MArray{ii-1}.H(indxn{ii-1},indxnp{ii-1}))))) ;
+end
+
+for ii = 1:nSub-1
+
+    fprintf('misfit is given by %d \n',...
+            norm(max(abs(MArray{ii+1}.H(indx0{ii+1},indx1{ii+1}) ...
+            - MArray{ii}.H(indxn{ii},indxnp{ii}))))) ;
+end
 
 
-M2 = model;
-M2.init(node2,elem2,omega,wpml,sigmaMax, pde,fquadorder);
+%% building the local-global indices
 
-ind2x0  = find(M2.node(M2.freeNode,1) == separator0 );
-ind2x1  = find(M2.node(M2.freeNode,1) == separator1 );
-ind2Int = find(M2.node(M2.freeNode,1) >= separator1 );
+indIntGlobal = {};
+for ii = 1:nSub
+    if ii == 1
+        indIntglobal{ii} = find(M0.node(M0.freeNode,1) <= separatorN(ii) );
+    elseif ii == nSub
+        indIntglobal{ii} = find(M0.node(M0.freeNode,1) >= separator1(ii-1) );
+    else
+        indIntglobal{ii} = find((M0.node(M0.freeNode,1) <= separatorN(ii) ).*  ...
+                                (M0.node(M0.freeNode,1) >= separator1(ii-1)));
+    end
+end
+  
+%% source partitioning
 
-H1 = M1.H;
-H2 = M2.H;
+fInt = f(M0.freeNode);
+fIntLocal = {};
+
+for ii = 1:nSub
+    fIntLocal{ii} = fInt(indIntglobal{ii});
+end
+
+% testing the the parititioning is done properly
+
+fTest = [];
+for ii = 1:nSub
+    fTest = [fTest; fIntLocal{ii}];
+end
+
+fprintf('misfit between the paritionned source %d \n', norm(fTest - fInt))
+
+indIntLocal = {};
+for ii = 1:nSub
+    if ii == 1
+        indIntLocal{ii} = find(MArray{ii}.node((MArray{ii}.freeNode,1) <= separatorN(ii) );
+    elseif ii == nSub
+        indIntLocal{ii} = find(MArray{ii}.node(MArray{ii}.freeNode,1) >= separator1(ii-1) );
+    else
+        indIntLocal{ii} = find((MArray{ii}.node(MArray{ii}.freeNode,1) <= separatorN(ii) ).*  ...
+                                (MArray{ii}.node(MArray{ii}.freeNode,1) >= separator1(ii-1)));
+    end
+end
+
 
 %% testing the reconstruction
 % interior souce
