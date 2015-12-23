@@ -15,7 +15,7 @@ function A = assemble_Helmholtz_matrix(node,elem,omega,wpml,sigmaMax,speed,fquad
 %
 %   omega: Angular frequency
 % 
-%   wpml: Width of the PML
+%   wpml: vector (4,1) Width of the PML in each direction 
 % 
 %   sigmaMax: Maximun absorbtion
 %
@@ -45,12 +45,26 @@ xmin = min(node(:,1));
 ymax = max(node(:,2));
 ymin = min(node(:,2));
 
+% in order to define the correct boundary conditionts at the interfaces
+% we need to specify the width of the PML in eevry direction
+%    ---wpml(1)---
+%   |             |
+%   |             |
+%  wpml(3)     wpml(4)
+%   |             |
+%   |             |
+%    ---wpml(2)---
+%
+
+if length(wpml) == 1
+    wpml = ones(4,1)*wpml
+end
 
 %% PML set up
-sigmaPML_x = @(x)sigmaMax*( (x-xmin-wpml).^2.*(x < xmin + wpml) + ...
-                (x-(xmax-wpml)).^2.*(x > xmax - wpml))/wpml^2;         
-sigmaPML_y = @(y) sigmaMax*( (y-ymin-wpml).^2.*(y < ymin + wpml) ...
-                + (y-(ymax-wpml)).^2.*(y > ymax - wpml))/wpml^2;
+sigmaPML_x = @(x)sigmaMax*( (x-xmin-wpml(1)).^2.*(x < xmin + wpml(1))/wpml(1)^2 + ...
+                (x-(xmax-wpml(2))).^2.*(x > xmax - wpml(2))/wpml(2)^2);         
+sigmaPML_y = @(y) sigmaMax*( (y-ymin-wpml(3)).^2.*(y < ymin + wpml(3))/wpml(3)^2 ...
+                + (y-(ymax-wpml(4))).^2.*(y > ymax - wpml(4))/wpml(4)^2);
 s_x = @(x,y) (1+1i*sigmaPML_y(y)/omega)./(1+1i*sigmaPML_x(x)/omega);       %% s1/s2
 s_y = @(x,y) (1+1i*sigmaPML_x(x)/omega)./(1+1i*sigmaPML_y(y)/omega);       %% s2/s1
 s_xy = @(x,y) ((1+1i*sigmaPML_x(x)/omega).*(1+1i*sigmaPML_y(y)/omega));    %% 1/(s1*s2)
