@@ -1,7 +1,33 @@
 function uPrecond = GSpreconditioner(MArray, indx0, indx1, indxn ,indxnp, ...
-                                     fIntLocal )
+                                     indIntGlobal, indIntLocal, fInt )
+% function uPrecond = GSpreconditioner(MArray, indx0, indx1, indxn ,indxnp,
+%                                      indIntGlobal, indIntLocal, fInt )
+% This function applies the Polarized traces preconditioner using the
+% optimized Gauss-Seidel version. (See Fast Domain Decomposition solver for
+% the Lippmann-Schwinger equation). 
+% TODO: this needs to be futher encapsulated                               
+                                 
+%% extracting some usefull information   
+nSub =  length(MArray);
 
+% size of the local traces
+n = size(indxn{1},1);
 
+u_0  = zeros(n*nSub,1);
+u_1  = zeros(n*nSub,1);
+u_n  = zeros(n*nSub,1);
+u_np = zeros(n*nSub,1);
+
+index = 1:n;
+
+%% source partitionning 
+
+fIntLocal = {};
+
+for ii = 1:nSub
+    fIntLocal{ii} = zeros(size(MArray{ii}.node(MArray{ii}.freeNode,1),1),1);
+    fIntLocal{ii}(indIntLocal{ii}) = fInt(indIntGlobal{ii});
+end
 
 localLim = [0 cumsum(localSizes)];
 
