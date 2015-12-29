@@ -4,16 +4,17 @@ classdef subdomain < handle
     
     properties
         model
-        ylimits 
-        yIndBdy0
-        yIndBdy1
-        yIndBdyn
-        yIndBdynp
+        indIntGlobal  
+        indxn
+        indxnp
+        indx0
+        indx1
+        position
         %bdyConditions
     end
     
     methods
-        % function to build the model and save the data needed to solve it
+        %TODO find the correct data for the subdomain
         function init(obj, node,elem,omega,wpml,sigmaMax,pde,fquadorder)
             
             % assembling the full matrix
@@ -42,6 +43,30 @@ classdef subdomain < handle
             obj.local_solver = solver(obj.H);
         end
          
+        
+         function u = solveTraces(obj, f, v0,v1, vn,vnp)
+        %  u = solveInt(obj, f)
+        % function to solve the Helmholtz equation for only the interior 
+        % points, this is necessary for the fast solver (otherwise is a
+        % huge pain 
+        % input:    f vector encoding the source
+        %           v0 trace of v at 0
+        %           v1 trace of v at 1
+        %           vn trace of v at n
+        %           vnp trace of v at np
+          
+        f(obj.ind1xn) =  f(obj.ind1xn) - obj.model.H(obj.ind1xn ,obj.ind1xnp)*vnp;
+        f(obj.ind1xnp)= f(obj.ind1xnp) + obj.model.H(obj.ind1xnp,obj.ind1xn )*vn;
+        
+        f(obj.ind2x0) = f(obj.ind2x0) + obj.model.H(obj.ind2x0,obj.ind2x1)*v1;
+        f(obj.ind2x1) = f(obj.ind2x1) - obj.model.H(obj.ind2x1,obj.ind2x0)*v0;
+
+        u = obj.model.solve(f);
+        
+        end
+        
+        
+        
         % TODO extend the definition of the function in order to handle 
         % boundary conditions. 
         function u = solve(obj, f)
@@ -77,11 +102,27 @@ classdef subdomain < handle
            end
         end
         
-        function LU_factorization(obj)
-            % defining the local factorization, which are encapsulated
-            % inside the local_solver (see the 
-            obj.local_solver = solver(obj.H); 
+        function u = solveTraces(obj, f, v0,v1, vn,vnp)
+        %  u = solveInt(obj, f)
+        % function to solve the Helmholtz equation for only the interior 
+        % points, this is necessary for the fast solver (otherwise is a
+        % huge pain 
+        % input:    f vector encoding the source
+        %           v0 trace of v at 0
+        %           v1 trace of v at 1
+        %           vn trace of v at n
+        %           vnp trace of v at np
+          
+        f(obj.ind1xn) =  f(obj.ind1xn) - obj.model.H(obj.ind1xn ,obj.ind1xnp)*vnp;
+        f(obj.ind1xnp)= f(obj.ind1xnp) + obj.model.H(obj.ind1xnp,obj.ind1xn )*vn;
+        
+        f(obj.ind2x0) = f(obj.ind2x0) + obj.model.H(obj.ind2x0,obj.ind2x1)*v1;
+        f(obj.ind2x1) = f(obj.ind2x1) - obj.model.H(obj.ind2x1,obj.ind2x0)*v0;
+
+        u = obj.model.solve(f);
+        
         end
+        
         
         
        function showresult(obj,u,viewangle)
