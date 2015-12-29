@@ -25,7 +25,7 @@ a = 1/2;
 % physical domain between -(a, a) to (a, a)
 NPW = 10;
 
-omega = 2*pi*3;
+omega = 2*pi*6;
 % discretization step (the constant needs to be modified)
 h = 1/2^(round(log2((NPW*omega)/(2*pi))));
 
@@ -36,7 +36,7 @@ npml = round(ceil(wpml/h));
 sigmaMax = 25/wpml;
 
 % Number of subdomains
-nSub = 4;
+nSub = 6;
 
 
 a = a + wpml ;         % computational domian [-a,a]^2
@@ -49,6 +49,9 @@ a = a + wpml ;         % computational domian [-a,a]^2
 % initialazing the model 
 M0 = model;
 M0.init(node,elem,omega,wpml,sigmaMax, pde,fquadorder);
+
+% performing LU factorization
+M0.LU_factorization()
 
 % solving the PDE
 f = assemble_RHS(node,elem,pde.f,fquadorder);
@@ -76,6 +79,7 @@ nIndLim = round(linspace(1,nInt-1,nSub+1));
 % indices at which each subdomain starts (and finishes)
 indn = npml + nIndLim(2:end);
 ind1 = npml + nIndLim(1:end-1)+1;
+ind1(1) = ind1(1) -1
 
 xn = x(indn);
 x1 = x(ind1);
@@ -104,10 +108,10 @@ for ii = 1:nSub
     % we need to be carefull when defining the PML
     if ii == 1
         wpmlvec = [wpml, wpml-2*h, wpml, wpml];
-    elseif ii ==nSub
+    elseif ii == nSub
         wpmlvec = [wpml-2*h, wpml, wpml, wpml];
     else
-         wpmlvec = [wpml-2*h, wpml-2*h, wpml, wpml];
+        wpmlvec = [wpml-2*h, wpml-2*h, wpml, wpml];
     end     
     MArray{ii}.init(nodeArray{ii},elemArray{ii},omega,...
                     wpmlvec,sigmaMax,pde,fquadorder);
@@ -155,14 +159,15 @@ end
 indIntGlobal = {};
 for ii = 1:nSub
     if ii == 1
-        indIntglobal{ii} = find(M0.node(M0.freeNode,1) <= separatorN(ii) );
+        indIntGlobal{ii} = find(M0.node(M0.freeNode,1) <= separatorN(ii) );
     elseif ii == nSub
-        indIntglobal{ii} = find(M0.node(M0.freeNode,1) >= separator1(ii-1) );
+        indIntGlobal{ii} = find(M0.node(M0.freeNode,1) >= separator1(ii-1) );
     else
-        indIntglobal{ii} = find((M0.node(M0.freeNode,1) <= separatorN(ii) ).*  ...
+        indIntGlobal{ii} = find((M0.node(M0.freeNode,1) <= separatorN(ii) ).*  ...
                                 (M0.node(M0.freeNode,1) >= separator1(ii-1)));
     end
 end
+  
   
 %% source partitioning
 
@@ -170,7 +175,7 @@ fInt = f(M0.freeNode);
 fIntLocal = {};
 
 for ii = 1:nSub
-    fIntLocal{ii} = fInt(indIntglobal{ii});
+    fIntLocal{ii} = fInt(indIntGlobal{ii});
 end
 
 % testing the the parititioning is done properly
@@ -182,10 +187,12 @@ end
 
 fprintf('misfit between the paritionned source %d \n', norm(fTest - fInt))
 
+% building the local solutions 
+
 indIntLocal = {};
 for ii = 1:nSub
     if ii == 1
-        indIntLocal{ii} = find(MArray{ii}.node((MArray{ii}.freeNode,1) <= separatorN(ii) );
+        indIntLocal{ii} = find(MArray{ii}.node(MArray{ii}.freeNode,1) <= separatorN(ii) );
     elseif ii == nSub
         indIntLocal{ii} = find(MArray{ii}.node(MArray{ii}.freeNode,1) >= separator1(ii-1) );
     else
@@ -194,61 +201,107 @@ for ii = 1:nSub
     end
 end
 
+%% preconditioner 
 
-%% testing the reconstruction
-% interior souce
+
 fInt = f(M0.freeNode);
-% interior solution
-vInt = v(M0.freeNode);
+fIntLocal = {};
+fExtLocal = {};
 
-v0 = vInt(find(M0.node(M0.freeNode,1) == separator0 ))
-v1 = vInt(find(M0.node(M0.freeNode,1) == separator1 ))
+for ii = 1:nSub
+    fIntLocal{ii} = zeros(size(MArray{ii}.node(MArray{ii}.freeNode,1),1),1);
+    fIntLocal{ii}(indIntLocal{ii}) = fInt(indIntGlobal{ii});
+end
 
-indInt1 = find(M0.node(M0.freeNode,1) <= separator0 );
-indInt2 = find(M0.node(M0.freeNode,1) >= separator1);
+%% Factorizing the local matrices
 
-%(we need to obtain the different set of indices to make the correct trnasition)
+for ii = 1:nSub
+   MArray{ii}.LU_factorization();
+end
 
-f1 = zeros(length(M1.freeNode),1);
-f2 = zeros(length(M2.freeNode),1);
+%Defining the local traces 
 
-f1(ind1Int) = fInt(indInt1);
-f2(ind2Int) = fInt(indInt2);
+% size of the local traces
+n = size(indxn{3},1);
 
-% adding the GRF for the first su
-f1(ind1xn) =  f1(ind1xn)  - M1.H(ind1xn ,ind1xnp)*v1;
-f1(ind1xnp) = f1(ind1xnp) + M1.H(ind1xnp,ind1xn )*v0;
+u_0  = zeros(n*nSub,1);
+u_1  = zeros(n*nSub,1);
+u_n  = zeros(n*nSub,1);
+u_np = zeros(n*nSub,1);
 
-u1 = M1.solveInt(f1);
-
-uu1 = zeros(size(M1.node,1),1);
-uu1(M1.freeNode) = u1;
+index = 1:n;
 
 
-figure(2); clf(); 
-M1.showresult(real(uu1));
+%% Solving for each subdomain 
+uArray = {};
+for ii = 1:nSub
+    uArray{ii} = MArray{ii}.solveInt(fIntLocal{ii});
+    localSizes(ii) = size(indIntGlobal{ii},1);
+end
 
-f2(ind2x0) = f2(ind2x0) + M2.H(ind2x0,ind2x1)*v1;
-f2(ind2x1) = f2(ind2x1) - M2.H(ind2x1,ind2x0 )*v0;
+localLim = [0 cumsum(localSizes)];
 
-u2 = M2.solveInt(f2);
+%% local solve + downwards sweep
+for ii = 1:nSub
+   
+        % making a local copy of the local rhs
+    rhsLocaltemp = fIntLocal{ii};
 
-uu2 = zeros(size(M2.node,1),1);
-uu2(M1.freeNode) = u2;
+    if ii ~=1
+        rhsLocaltemp(indx0{ii}) =  rhsLocaltemp(indx0{ii}) +...
+                   MArray{ii}.H(indx0{ii},indx1{ii})*u_np((ii-2)*n + index);
+        rhsLocaltemp(indx1{ii}) = rhsLocaltemp(indx1{ii}) -...
+                    MArray{ii}.H(indx1{ii},indx0{ii})*u_n((ii-2)*n + index);
+    end
 
-figure(3); clf(); 
-M2.showresult(real(uu2));
+        % solving the rhs
+        vDown = MArray{ii}.solveInt(rhsLocaltemp);
 
-%% adding the local solutions together
+        % extracting the traces
+        if ii ~= nSub
+            u_n((ii-1)*n  + index) = vDown(indxn{ii});
+            u_np((ii-1)*n + index) = vDown(indxnp{ii});
+        end
+end
 
-U = zeros(size(M0.freeNode,1),1);
+%% upwards sweep + reflections + reconstruction
 
-U(indInt1) = u1(ind1Int);
-U(indInt2) = u2(ind2Int);
+uPrecond = zeros(size(fInt,1),1);
 
-UU = zeros(size(M0.node,1),1);
-UU(M0.freeNode) = U;
-figure(4); clf();
-M0.showresult(real(UU))
+     for ii = nSub:-1:1
+      
+        % making a copy of the parititioned source
+         rhsLocaltemp = fIntLocal{ii};
 
-fprintf('Error in the reconstruction is %d \n', norm(v - UU)/norm(v))
+        % adding the source at the boundaries
+        if ii~= 1
+            % we need to be carefull at the edges
+            rhsLocaltemp(indx1{ii})  = rhsLocaltemp(indx1{ii}) - ...
+               MArray{ii}.H(indx1{ii},indx0{ii})*u_n((ii-2)*n + index);
+            rhsLocaltemp(indx0{ii})  =  rhsLocaltemp(indx0{ii}) ...
+                + MArray{ii}.H(indx0{ii},indx1{ii})*u_np((ii-2)*n + index);
+        end
+        if ii~= nSub
+            rhsLocaltemp(indxnp{ii}) = rhsLocaltemp(indxnp{ii}) + ...
+                MArray{ii}.H(indxnp{ii},indxn{ii})*u_0((ii)*n + index);
+            rhsLocaltemp(indxn{ii})  = rhsLocaltemp(indxn{ii}) - ...
+                MArray{ii}.H(indxn{ii},indxnp{ii})*u_1((ii)*n + index);
+        end
+ 
+        % solving the local problem
+        uUp = MArray{ii}.solveInt(rhsLocaltemp);
+
+        if ii > 1
+            u_0((ii-1)*n + index) = uUp(indx0{ii});
+            u_1((ii-1)*n + index) = uUp(indx1{ii}) - u_np((ii-2)*n + index);
+        end
+
+        % reconstructing the problem on the fly
+        uPrecond(localLim(ii)+1:localLim(ii+1)) = uUp(indIntLocal{ii});
+    end
+
+%% Padding the preconditioned solution 
+
+UPrecond = zeros(size(v,1),1);
+UPrecond(M0.freeNode) = uPrecond;
+norm(v - UPrecond)
