@@ -45,7 +45,7 @@ classdef model < handle
             fprintf('Assembling the Helmholtz matrix \n');
             obj.H = A(obj.freeNode,obj.freeNode);
             
-            obj.local_solver = solver(obj.H);
+            %obj.local_solver = solver(obj.H);
         end
          
         % TODO extend the definition of the function in order to handle 
@@ -84,7 +84,7 @@ classdef model < handle
         end
         
         function LU_factorization(obj)
-            % defining the local factorization, which are encapsulated
+            % defining the local factorization, which is encapsulated
             % inside the local_solver (see the 
             obj.local_solver = solver(obj.H); 
         end
