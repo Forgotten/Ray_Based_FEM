@@ -42,7 +42,7 @@ classdef solver < handle
             % Output: u the solution to the set of systems Hu = f
 
             
-            fprintf('Solving using LU factorization \n')
+            % fprintf('Solving using LU factorization \n')
             if size(f,1) == obj.n  % if the dimension match
                 u = obj.Q*(obj.U\(obj.L\(obj.P*f)));
             else
