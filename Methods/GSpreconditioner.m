@@ -23,10 +23,13 @@ index = 1:n;
 %% source partitionning 
 
 fIntLocal = {};
+% we need to extract the sizes of each local solution 
+localSizes = zeros( 1, nSub);
 
 for ii = 1:nSub
     fIntLocal{ii} = zeros(size(MArray{ii}.node(MArray{ii}.freeNode,1),1),1);
     fIntLocal{ii}(indIntLocal{ii}) = fInt(indIntGlobal{ii});
+    localSizes(ii) = size(indIntGlobal{ii},1);
 end
 
 localLim = [0 cumsum(localSizes)];
@@ -88,4 +91,6 @@ uPrecond = zeros(size(fInt,1),1);
 
         % reconstructing the problem on the fly
         uPrecond(localLim(ii)+1:localLim(ii+1)) = uUp(indIntLocal{ii});
-    end
+     end
+    
+end
