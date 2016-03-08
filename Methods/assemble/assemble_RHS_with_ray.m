@@ -82,8 +82,8 @@ for ni = 1:Nray
     btii = bt(ii,:);
     b(jj) = accumarray(elem(:),btii(:),[N 1]);
 end
-clear area b bt btii elem fp fphasei gradtempi ii jj k kk kki;
+clear area bt btii elem fp fphasei gradtempi ii jj k kk kki;
 clear node phasei pcy pxy ray reparea reppxy;
 
-frpintf('\n');
+fprintf('\n');
 

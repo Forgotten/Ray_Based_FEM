@@ -56,8 +56,11 @@ ymin = min(node(:,2));
 %    ---wpml(2)---
 %
 
+% if the different lengths of the pml are not specified we specify all of
+% them uisng the same number of pml points
+
 if length(wpml) == 1
-    wpml = ones(4,1)*wpml
+    wpml = ones(4,1)*wpml;
 end
 
 %% PML set up
