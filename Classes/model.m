@@ -3,13 +3,13 @@ classdef model < handle
     % needed to solve the Helmholtz equation inside it
     
     properties
-        node
+        node  % the node structure
         elem 
         omega 
         npml    % number of points of the PML
         wpml
         sigmaMax
-        pde
+        speed
         fquadorder
         local_solver % local solver encapsulated in here
         plt
@@ -20,11 +20,11 @@ classdef model < handle
     
     methods
         % function to build the model and save the data needed to solve it
-        function init(obj, node,elem,omega,wpml,sigmaMax,pde,fquadorder)
+        function init(obj, node,elem,omega,wpml,sigmaMax,speed,fquadorder)
             
             % assembling the full matrix
             A = assemble_Helmholtz_matrix(node, elem, omega, wpml, ...
-                                          sigmaMax, pde.speed, fquadorder);
+                                          sigmaMax, speed, fquadorder);
             
             obj.node = node;
             obj.elem = elem; 
@@ -32,7 +32,7 @@ classdef model < handle
             %obj.npml    % number of points of the PML
             obj.wpml = wpml;
             obj.sigmaMax = sigmaMax;
-            obj.pde = pde ;
+            obj.speed = speed ;
             obj.fquadorder = fquadorder;
             % Boundary conditions for the PML Case
             [~,~,isBdNode] = findboundary(elem);
@@ -48,6 +48,33 @@ classdef model < handle
             %obj.local_solver = solver(obj.H);
         end
          
+        function initRay(obj, node,elem,omega,wpml,sigmaMax,speed,fquadorder)
+            % init system using the ray based matrices
+            % assembling the full matrix
+            A = assemble_Helmholtz_matrix_with_ray(node, elem, omega, wpml, ...
+                                          sigmaMax, speed, ray, fquadorder);
+            
+            obj.node = node;
+            obj.elem = elem; 
+            obj.omega = omega;
+            %obj.npml    % number of points of the PML
+            obj.wpml = wpml;
+            obj.sigmaMax = sigmaMax;
+            obj.speed = speed ;
+            obj.fquadorder = fquadorder;
+            % Boundary conditions for the PML Case
+            [~,~,isBdNode] = findboundary(elem);
+            obj.freeNode = find(~isBdNode);
+            % we need to add all the local solver properties
+            % in particulat which are the indices of the degrees of 
+            % freedom at the boundary
+            
+            % Imposing the homogeneous Dirichlet boundary conditions
+            fprintf('Assembling the Helmholtz matrix \n');
+            obj.H = A(obj.freeNode,obj.freeNode);
+            
+            %obj.local_solver = solver(obj.H);
+        end
         % TODO extend the definition of the function in order to handle 
         % boundary conditions. 
         function u = solve(obj, f)

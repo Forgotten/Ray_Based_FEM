@@ -4,18 +4,21 @@ classdef subdomain < handle
     
     properties
         model
+        indIntLocal
         indIntGlobal  
         indxn
         indxnp
         indx0
         indx1
+        n1   % number of degreed of freedom at the top interface
+        nn   % number of degrees of freedom at the bottom interface
         position
         %bdyConditions
     end
     
     methods
         %TODO find the correct data for the subdomain
-        function init(obj, node,elem,omega,wpml,sigmaMax,pde,fquadorder)
+        function initModel(obj, node,elem,omega,wpml,sigmaMax,pde,fquadorder)
             
             % assembling the full matrix
             A = assemble_Helmholtz_matrix(node, elem, omega, wpml, ...
@@ -42,10 +45,24 @@ classdef subdomain < handle
             
             obj.local_solver = solver(obj.H);
         end
-         
         
-         function u = solveTraces(obj, f, v0,v1, vn,vnp)
-        %  u = solveInt(obj, f)
+        function init_Model(obj,model,indIntLocal, indIntGlobal, indxn, indxnp, indx0, indx1, position)
+            % function to initialize the subdomain given that hte model has
+            % already been computed.
+            obj.model = model;
+            obj.indIntLocal = indIntLocal;
+            obj.indIntGlobal  = indIntGlobal;
+            obj.nn = length(indxn);
+            obj.indxn  = indxn;
+            obj.indxnp = indxnp;
+            obj.n1 = length(indx0);
+            obj.indx0  = indx0;
+            obj.indx1  = indx1;
+            obj.position = position;
+        end
+        
+        function u = solveTraces(obj, f, v0,v1, vn,vnp)
+        % u = solveInt(obj, f)
         % function to solve the Helmholtz equation for only the interior 
         % points, this is necessary for the fast solver (otherwise is a
         % huge pain 
@@ -54,39 +71,81 @@ classdef subdomain < handle
         %           v1 trace of v at 1
         %           vn trace of v at n
         %           vnp trace of v at np
-          
-        f(obj.ind1xn) =  f(obj.ind1xn) - obj.model.H(obj.ind1xn ,obj.ind1xnp)*vnp;
-        f(obj.ind1xnp)= f(obj.ind1xnp) + obj.model.H(obj.ind1xnp,obj.ind1xn )*vn;
         
-        f(obj.ind2x0) = f(obj.ind2x0) + obj.model.H(obj.ind2x0,obj.ind2x1)*v1;
-        f(obj.ind2x1) = f(obj.ind2x1) - obj.model.H(obj.ind2x1,obj.ind2x0)*v0;
-
-        u = obj.model.solve(f);
+        % size checks
         
+        if obj.position ~= 'N'
+            if (length(v0) ~= obj.n1 ||  length(v1) ~= obj.n1)
+                error('vector size of the traces 0 or 1 are not consistent')
+            end
+            
+            f(obj.indx0,:) = f(obj.indx0,:) + obj.model.H(obj.indx0,obj.indx1)*v1;
+            f(obj.indx1,:) = f(obj.indx1,:) - obj.model.H(obj.indx1,obj.indx0)*v0;
         end
         
         
+        if obj.position ~= 'S'
+        if (length(vn) ~= obj.nn ||  length(vnp) ~= obj.nn)
+            error('vector size of the traces 0 or 1 are not consistent')
+        end
+        
+            f(obj.indxn,:) = f(obj.indxn,:)  - obj.model.H(obj.indxn ,obj.indxnp)*vnp;
+            f(obj.indxnp,:)= f(obj.indxnp,:) + obj.model.H(obj.indxnp,obj.indxn )*vn;
+        
+        end
+        
+        u = obj.model.solveInt(f);
+        
+        end
+        
+        function [u0, u1, un, unp] = applyBlockOperator(obj, v0,v1, vn,vnp)
+            % function to apply the integral operator to the traces of the
+            % wavefield at the interfaces.
+            f = zeros(size(obj.model.node(obj.model.freeNode,1),1),1);
+            u = obj.solveTraces(f, v0,v1, vn,vnp);
+            [u0, u1, un, unp] = obj.extractLocalTraces(u);
+        end
+        
+        function [u0, u1, un, unp] = extractLocalTraces(obj,u)
+            % TODO put sizes checks everywhere!!! 
+            u0  = u(obj.indx0);
+            u1  = u(obj.indx1);
+            un  = u(obj.indxn);
+            unp = u(obj.indxnp);
+        end
+        
+        function LU_factorization(obj)
+            % defining the local factorization, which is encapsulated
+            % inside the local_solver (see the 
+            obj.model.LU_factorization(); 
+        end
+        
+        
+        function fIntLocal = extractLocalSource(obj, f)
+            % function to extract the information from the global source to
+            % to a local one.
+            % create a local vector with the correct sizes (carefull with
+            % the extra degrees of freedom from the boudnary that have to
+            % be removes
+            fIntLocal = zeros(size(obj.model.node(obj.model.freeNode,1),1),1);
+            % copying from the global source to the local one
+            fIntLocal(obj.indIntLocal) = f(obj.indIntGlobal);
+        end
+        
+        function uIntLocal = extractLocalInt(obj, u)
+            % function to extract the wavefield information from the
+            % interios degrees of freedom of a local wavefield
+            uIntLocal = u(obj.indIntLocal); 
+        end
         
         % TODO extend the definition of the function in order to handle 
         % boundary conditions. 
-        function u = solve(obj, f)
+        function u = solveLocal(obj, f)
         %  u = solve(obj, f)
         % function to solve the Helmholtz equation
         % input:  f source, this can be a either a vector or a function
         %                   handle
-           if  isa(f,'function_handle')
-               u = zeros(size(obj.node,1),1);
-               % f is a function handle, then we need to project it into
-               % the Galerking space
-               b = assemble_RHS(obj.node,obj.elem,f,obj.fquadorder);
-               % we use only the interior points 
-               % and we call the solve function in the solver class
-               u(obj.freeNode) = obj.local_solver.solve(b(obj.freeNode));
-           elseif isvector(f)
-               % if f is a vector
-               u = zeros(size(obj.node,1),1);
-               u(obj.freeNode) = obj.local_solver.solve(b(obj.freeNode));
-           end
+         u = obj.model.solve(f);
         end
         
         function u = solveInt(obj, f)
@@ -98,31 +157,11 @@ classdef subdomain < handle
         %                   handle
            if isvector(f)
                % if f is a vector
-               u = obj.local_solver.solve(f);
+               u = obj.model.solveInt(f);
            end
         end
         
-        function u = solveTraces(obj, f, v0,v1, vn,vnp)
-        %  u = solveInt(obj, f)
-        % function to solve the Helmholtz equation for only the interior 
-        % points, this is necessary for the fast solver (otherwise is a
-        % huge pain 
-        % input:    f vector encoding the source
-        %           v0 trace of v at 0
-        %           v1 trace of v at 1
-        %           vn trace of v at n
-        %           vnp trace of v at np
-          
-        f(obj.ind1xn) =  f(obj.ind1xn) - obj.model.H(obj.ind1xn ,obj.ind1xnp)*vnp;
-        f(obj.ind1xnp)= f(obj.ind1xnp) + obj.model.H(obj.ind1xnp,obj.ind1xn )*vn;
-        
-        f(obj.ind2x0) = f(obj.ind2x0) + obj.model.H(obj.ind2x0,obj.ind2x1)*v1;
-        f(obj.ind2x1) = f(obj.ind2x1) - obj.model.H(obj.ind2x1,obj.ind2x0)*v0;
-
-        u = obj.model.solve(f);
-        
-        end
-        
+     
         
         
        function showresult(obj,u,viewangle)

@@ -1,7 +1,11 @@
 %% Driver for the standard finite element with absorbing boundary conditions 
 % implemented via PML using N different subdomains
 % We test the preconditioner (without encapsulation)
-
+% addpath('../Helmholtz_data/')
+% addpath('../Methods/')
+% addpath('../NMLA')
+% addpath('../Classes')
+% addpath(genpath('../../ifem-ifem-8af722848372'))
 
 
 %% Load source data
@@ -26,21 +30,20 @@ a = 1/2;
 NPW = 10;
 
 % number of wavelenghts inside the domain
-numberWavelengths = 96;
+numberWavelengths = 3*46;
 
 omega = 2*pi*numberWavelengths;
 % discretization step (the constant needs to be modified)
 h = 1/2^(round(log2((NPW*omega)/(2*pi))));
 
 % physical width of the PML
-wpml = 2*pi/omega + 2*h;
+wpml = 2*pi/omega + 4*h;
 npml = round(ceil(wpml/h));
 % maximum absoption of the PML
 sigmaMax = 25/wpml;
 
 % Number of subdomains
-nSub = 24;
-
+nSub =45;
 
 a = a + wpml ;         % computational domian [-a,a]^2
 
@@ -181,12 +184,21 @@ toc();
 %wrapper = partitioning(MArray, indx0, indx1, indxn ,indxnp, indIntGlobal, indIntLocal);
 
 % defining the wrapped preconditioner function                        
-GSPrecondF = @(x) GSpreconditioner(MArray, indx0, indx1, indxn ,indxnp, indIntGlobal, indIntLocal, x );
+%GSPrecond = @(x) GSpreconditioner(MArray, indx0, indx1, indxn ,indxnp, indIntGlobal, indIntLocal, x );
+
+% optimized version of the preconditioner (one less for loop) and some
+% modifications on the Array
+GSPrecondOpt = @(x) GSpreconditionerOpt(MArray, indx0, indx1, indxn ,indxnp, indIntGlobal, indIntLocal, x );
 
 % solving the linear sysmtem with GMRES
+%tic();
+%uGmres = gmres(M0.H, fInt,[], 1e-6, 10, GSPrecond );
+%toc()
+
 tic();
-uGmres = gmres(M0.H, fInt,[], 1e-6, 10, GSPrecondF );
+uGmres = gmres(M0.H, fInt,[], 1e-6, 10, GSPrecondOpt );
 toc()
+
 
 %% Padding the preconditioned solution 
 
