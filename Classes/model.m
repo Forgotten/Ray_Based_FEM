@@ -48,7 +48,7 @@ classdef model < handle
             %obj.local_solver = solver(obj.H);
         end
          
-        function initRay(obj, node,elem,omega,wpml,sigmaMax,speed,fquadorder)
+        function initRay(obj, node,elem,omega,wpml,sigmaMax,speed,ray,fquadorder)
             % init system using the ray based matrices
             % assembling the full matrix
             A = assemble_Helmholtz_matrix_with_ray(node, elem, omega, wpml, ...
