@@ -133,10 +133,12 @@ classdef model < handle
             %set(gcf,'Position',[0.25,0.25,0.45,0.25]); 
             subplot(1,2,1); 
             showsolution(obj.node,obj.elem,u,2);
+            axis 'equal'
             colorbar;
             %     pause(0.05)
             subplot(1,2,2); 
             showsolution(obj.node,obj.elem,u);
+            axis 'equal'
             if nargin>2
                 view(viewangle);
             end

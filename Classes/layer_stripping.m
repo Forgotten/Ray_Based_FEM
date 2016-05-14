@@ -145,6 +145,9 @@ classdef layer_stripping < handle
             
             for ii = 2:obj.nLayer-1
                 % parsing the information at the boundary
+                % we need to remember that in the general case, we won't
+                % have the same amount of interface data at each layer
+                % this part should be modified accordingly
                 indlocal1 = indStart + (1:obj.M{ii}.n1);  % defining the local indeces
                 indlocaln = indStart + 2*obj.M{ii}.n1 + (1:obj.M{ii}.nn);
                 indStart =  max(indlocal1) + obj.M{ii}.n1;
