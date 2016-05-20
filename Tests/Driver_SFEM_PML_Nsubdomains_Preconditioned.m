@@ -30,7 +30,7 @@ a = 1/2;
 NPW = 10;
 
 % number of wavelenghts inside the domain
-numberWavelengths = 3*46;
+numberWavelengths = 46;
 
 omega = 2*pi*numberWavelengths;
 % discretization step (the constant needs to be modified)
@@ -43,7 +43,7 @@ npml = round(ceil(wpml/h));
 sigmaMax = 25/wpml;
 
 % Number of subdomains
-nSub =45;
+nSub = 15;
 
 a = a + wpml ;         % computational domian [-a,a]^2
 
@@ -54,7 +54,7 @@ a = a + wpml ;         % computational domian [-a,a]^2
 
 % initialazing the  global model 
 M0 = model;
-M0.init(node,elem,omega,wpml,sigmaMax, pde,fquadorder);
+M0.init(node,elem,omega,wpml,sigmaMax, pde.speed, fquadorder);
 
 % performing LU factorization
 %M0.LU_factorization()
