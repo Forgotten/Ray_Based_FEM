@@ -63,10 +63,10 @@ end
 %                  + (p(:,2)-(ymax-wpml(4))).^2.*(p(:,2) > ymax - wpml(4))/wpml(4)^2);
 
 % % unbounded PML profile             
-sigmaPML_x = @(p) speed(p).*(1./(p(:,1)-xmin ).*(p(:,1) < xmin + wpml(1)) + ...
-                1./(xmax-p(:,1) ).*(p(:,1) > xmax - wpml(2))) ;         
-sigmaPML_y = @(p) speed(p).*( 1./(p(:,2)-ymin ).*(p(:,2) < ymin + wpml(3)) ...
-                + 1./(ymax-p(:,2) ).*(p(:,2) > ymax - wpml(4)));
+sigmaPML_x = @(p) speed(p).*(1./(p(:,1)-xmin + sigmaMax ).*(p(:,1) < xmin + wpml(1)) + ...
+                1./(xmax-p(:,1) + sigmaMax ).*(p(:,1) > xmax - wpml(2))) ;         
+sigmaPML_y = @(p) speed(p).*( 1./(p(:,2)-ymin + sigmaMax ).*(p(:,2) < ymin + wpml(3)) ...
+                + 1./(ymax-p(:,2) + sigmaMax).*(p(:,2) > ymax - wpml(4)));
             
 s_x = @(p) (1+1i*sigmaPML_y(p)/omega)./(1+1i*sigmaPML_x(p)/omega);       %% s1/s2
 s_y = @(p) (1+1i*sigmaPML_x(p)/omega)./(1+1i*sigmaPML_y(p)/omega);       %% s2/s1
