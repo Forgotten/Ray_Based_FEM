@@ -55,7 +55,7 @@ a = a + wpml ;         % computational domian [-a,a]^2
 
 % initialazing the  global model 
 M0 = model;
-M0.init(node,elem,omega,wpml,sigmaMax, pde.speed,fquadorder);
+M0.init(node,elem,omega,wpml,h/NPW, pde.speed,fquadorder);
 
 % % performing LU factorization (only if we want ot compare against the true
 % % solution 
@@ -126,7 +126,7 @@ for ii = 1:nSub
         wpmlvec = [wpml-2*h, wpml-2*h, wpml, wpml];
     end     
     MArray{ii}.init(nodeArray{ii},elemArray{ii},omega,...
-                    wpmlvec,sigmaMax,pde.speed,fquadorder);
+                    wpmlvec,h/NPW,pde.speed,fquadorder);
 
 end
 

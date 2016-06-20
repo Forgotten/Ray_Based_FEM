@@ -22,38 +22,41 @@ speed  = @(x) ones(size(x(:,1)));
 
 %% Set up
 plt = 0;                   % show solution or not
-fquadorder = 6;            % numerical quadrature order
-NPW = 10;
+fquadorder = 10;            % numerical quadrature order
 
 % size of the physical domain
 a = 1/2;
 % physical domain between -(a, a) to (a, a)
-NPW = 10;
+NPW = 8;
+
+mult = 2;
 
 % number of wavelenghts inside the domain
-numberWavelengths = 2*23;
+numberWavelengths = mult*16;
 
 omega = 2*pi*numberWavelengths;
 % discretization step (the constant needs to be modified)
 h = 1/2^(round(log2((NPW*omega)/(2*pi))));
 
 % physical width of the PML
-wpml = 2*pi/omega + h;
+wpml = 2*pi/omega + mult*h/NPW;
 npml = round(ceil(wpml/h));
 % maximum absorption of the PML
 sigmaMax = 25/wpml;
 
 % Number of subdomains
-nSub = 2*7 ;
+nSub = mult*10 ;
 
 % computational domain [-a,a]^2 (we add the pml in this case)
 a = a + wpml ;         
 
 [node,elem] = squaremesh([-a,a,-a,a],h);
 
+fprintf('Number of degrees of freedom is %d \n', size(node,1));
+
 %% building the source 
 k = omega;
-sigma = 1/200;
+sigma = 1/k;
 
 source = @(p) -4*sqrt(k)*1i*1/(2*pi*sigma^2)*exp( -( (p(:,1)-xc).^2 + (p(:,2)-yc).^2  )/(2*sigma^2) );
 
@@ -74,7 +77,7 @@ Ndof = N*Nray;
 
 % initialazing the global model 
 M0 = model;
-M0.initRay(node,elem,omega,wpml,sigmaMax, speed, ray, fquadorder);
+M0.initRay(node,elem,omega,wpml,h/NPW, speed, ray, fquadorder);
 
 % % performing LU factorization (only if we want ot compare against the true
 % % solution 
@@ -177,7 +180,7 @@ for ii = 1:nSub
         wpmlvec = [wpml-2*h, wpml-2*h, wpml, wpml];
     end     
     MArray{ii}.initRay(nodeArray{ii},elemArray{ii},omega,...
-                    wpmlvec,sigmaMax,speed,rayArray{ii},fquadorder);
+                    wpmlvec,h/NPW,speed,rayArray{ii},fquadorder);
 
 end
 
